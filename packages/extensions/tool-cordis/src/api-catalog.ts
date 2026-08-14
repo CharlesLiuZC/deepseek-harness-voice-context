@@ -2024,6 +2024,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'voiceContext',
+    summary: 'Speech-to-text service (`ctx.voiceContext`) exposed through Typert Gateway.',
+    description: 'Speech-to-text service (`ctx.voiceContext`) exposed through Typert Gateway.',
+    methods: [
+      {
+        signature: '@Remote(\'transcribe\') async transcribe(request: TranscribeRequest): Promise<TranscribeResult>',
+        description: 'Transcribe one audio payload through the configured STT provider.',
+        parameters: [{ name: 'request', description: 'audio container plus optional language, backend, and model choices.' }],
+        returns: 'the transcribed text.',
+      },
+    ],
+  },
+  {
     key: 'web',
     summary: 'The web access service.',
     description: 'The web access service. Registered as `ctx.web` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A configured id that is registered and `available()` → that provider.\n- A configured id not registered → `WEB_PROVIDER_CONFIGURED_MISSING`.\n- A configured id registered but unavailable → `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- No id configured, exactly one registered usable provider → that provider.\n- No id configured, multiple usable providers → `WEB_PROVIDER_AMBIGUOUS`.\n- No id configured, no usable provider → `WEB_PROVIDER_UNAVAILABLE`.',
@@ -2742,6 +2755,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ClientResponse {\n    type: \'client-response\';\n    rpcId: RpcId;\n    result: RpcResult<unknown>;\n}',
   },
   {
+    name: 'CloudTranscriptionModel',
+    declaration: 'export type CloudTranscriptionModel = \'FunAudioLLM/SenseVoiceSmall\';',
+  },
+  {
     name: 'CodeBindingErrorClass',
     declaration: 'export interface CodeBindingErrorClass {\n    name: string;\n    memberNameProperty: string;\n}',
   },
@@ -3316,6 +3333,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'LlmRuntime',
     declaration: 'export class LlmRuntime extends Service {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
+  },
+  {
+    name: 'LocalTranscriptionModel',
+    declaration: 'export type LocalTranscriptionModel = \'iic/SenseVoiceSmall\' | \'small\' | \'medium\' | \'large-v3\';',
   },
   {
     name: 'LspHover',
@@ -4448,6 +4469,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ToolSchema',
     declaration: 'export interface ToolSchema {\n    name: string;\n    description: string;\n    parameters: Record<string, unknown>;\n}',
+  },
+  {
+    name: 'TranscribeRequest',
+    declaration: 'export interface TranscribeRequest {\n    readonly audio: string;\n    readonly mimeType: string;\n    readonly language?: string;\n    readonly backend?: TranscriptionBackend;\n    readonly model?: TranscriptionModel;\n}',
+  },
+  {
+    name: 'TranscribeResult',
+    declaration: 'export interface TranscribeResult {\n    readonly text: string;\n}',
+  },
+  {
+    name: 'TranscriptionBackend',
+    declaration: 'export type TranscriptionBackend = \'cloud\' | \'local\';',
+  },
+  {
+    name: 'TranscriptionModel',
+    declaration: 'export type TranscriptionModel = CloudTranscriptionModel | LocalTranscriptionModel;',
   },
   {
     name: 'TurnEndCancelCause',

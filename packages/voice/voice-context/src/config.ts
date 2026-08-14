@@ -6,9 +6,8 @@
  * @module @deepseek-ai/dsh-voice-context/config
  */
 
-import z from '@deepseek-ai/schemastery'
-
-export interface Config {
+/** User-owned Voice-Context service configuration. */
+export interface VoiceContextConfig {
   /** Literal STT bearer token; prefer {@link apiKeyEnv}. */
   apiKey?: string
   /** Credential reference name resolved through the credentials seam each call. */
@@ -29,18 +28,6 @@ export interface Config {
   pythonBin?: string
 }
 
-export const Config: z<Config> = z.object({
-  apiKey: z.string().role('secret'),
-  apiKeyEnv: z.string().role('credential-ref').default('SILICONFLOW_API_KEY'),
-  baseUrl: z.string().default('https://api.siliconflow.cn'),
-  model: z.string().default('FunAudioLLM/SenseVoiceSmall'),
-  language: z.string().default('zh'),
-  maxBytes: z.natural().default(25 * 1024 * 1024),
-  timeoutMs: z.natural().default(60000),
-  localPort: z.natural().max(65535).default(8080),
-  pythonBin: z.string().default('python'),
-})
-
 /** Fully-defaulted configuration consumed by the service. */
 export interface ResolvedConfig {
   apiKey: string
@@ -54,8 +41,12 @@ export interface ResolvedConfig {
   pythonBin: string
 }
 
-/** Fill schema defaults over a partial entry config. */
-export function resolveConfig(config: Config): ResolvedConfig {
+/**
+ * Fill schema defaults over a partial entry config.
+ * @param config - partial Loader entry configuration.
+ * @returns the complete runtime configuration.
+ */
+export function resolveConfig(config: VoiceContextConfig): ResolvedConfig {
   return {
     apiKey: config.apiKey ?? '',
     apiKeyEnv: config.apiKeyEnv ?? 'SILICONFLOW_API_KEY',
@@ -64,7 +55,7 @@ export function resolveConfig(config: Config): ResolvedConfig {
     language: config.language ?? 'zh',
     maxBytes: config.maxBytes ?? 25 * 1024 * 1024,
     timeoutMs: config.timeoutMs ?? 60000,
-    localPort: config.localPort ?? 8080,
+    localPort: config.localPort ?? 8000,
     pythonBin: config.pythonBin ?? 'python',
   }
 }

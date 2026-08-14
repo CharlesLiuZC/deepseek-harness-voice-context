@@ -78,6 +78,51 @@ describe('transcribeAudio', () => {
     expect((init.headers as Record<string, string>).authorization).toBeUndefined()
   })
 
+  it('routes an explicit local model to the managed loopback port', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ text: 'local medium' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await transcribeAudio(new Context(), { ...cloudConfig(), localPort: 8000 }, {
+      audio: 'aGk=',
+      mimeType: 'audio/wav',
+      backend: 'local',
+      model: 'medium',
+    })
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('http://127.0.0.1:8000/v1/audio/transcriptions')
+    expect((init.headers as Record<string, string>).authorization).toBeUndefined()
+    expect((init.body as FormData).get('model')).toBe('medium')
+  })
+
+  it('routes an explicit cloud request away from a configured loopback backend', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ text: 'cloud' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await transcribeAudio(new Context(), {
+      ...cloudConfig(),
+      baseUrl: 'http://127.0.0.1:8000',
+    }, {
+      audio: 'aGk=',
+      mimeType: 'audio/wav',
+      backend: 'cloud',
+      model: 'FunAudioLLM/SenseVoiceSmall',
+    })
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://api.siliconflow.cn/v1/audio/transcriptions')
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer sk-test')
+  })
+
+  it('rejects a local-only model on the cloud route', async () => {
+    await expect(transcribeAudio(new Context(), cloudConfig(), {
+      audio: 'aGk=',
+      mimeType: 'audio/wav',
+      backend: 'cloud',
+      model: 'small',
+    })).rejects.toThrow('invalid cloud STT model')
+  })
+
   it('throws when the provider answers an error status', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'bad model' }), { status: 400 }))
     vi.stubGlobal('fetch', fetchMock)

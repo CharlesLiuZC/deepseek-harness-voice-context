@@ -27,6 +27,6 @@ describe('VoiceRecorder', () => {
 
   it('treats abort() before start as a no-op', () => {
     const recorder = new VoiceRecorder()
-    expect(() => recorder.abort()).not.toThrow()
+    expect(() => { recorder.abort() }).not.toThrow()
   })
 })

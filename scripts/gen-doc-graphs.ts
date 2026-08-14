@@ -222,6 +222,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Owns local per-assistant-message feedback, lifecycle and target validation, per-item compare-and-set, and the Host unary Remote contract without entering Session history or telemetry.',
   },
   {
+    key: 'voiceContext',
+    pkg: 'voice-context',
+    title: 'Voice transcription routing',
+    mode: 'core',
+    companions: ['ui-voice-context'],
+    note: 'Routes controlled cloud/local model choices across the Host trust boundary and forwards browser audio to an OpenAI-compatible transcription endpoint.',
+  },
+  {
     key: 'workspaceRegistry',
     pkg: 'workspace',
     title: 'Workspace entity registry',

@@ -10,6 +10,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { IApiClient } from '@deepseek-ai/dsh-client-connection/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { LocalTranscriptionModel, TranscriptionBackend } from '@deepseek-ai/dsh-voice-context/client'
+import {
+  hasSavedVoicePreference,
+  loadVoicePreference,
+  LOCAL_MODELS,
+  saveVoicePreference,
+  type VoicePreference,
+} from './preferences.ts'
 
 /** Credential reference the Host service resolves (see config.ts). */
 const KEY_REF = 'SILICONFLOW_API_KEY'
@@ -31,6 +39,8 @@ export function VoiceSettingsSection({ api }: VoiceSettingsProps) {
   const [writable, setWritable] = useState(true)
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [preference, setPreference] = useState<VoicePreference>(loadVoicePreference)
+  const [preferenceSaved, setPreferenceSaved] = useState(hasSavedVoicePreference)
 
   const refresh = useCallback(async () => {
     try {
@@ -66,6 +76,31 @@ export function VoiceSettingsSection({ api }: VoiceSettingsProps) {
   }, [api, draft, refresh])
 
   const lang = zh()
+  const selectBackend = useCallback((backend: TranscriptionBackend) => {
+    setPreference({
+      backend,
+      model: backend === 'cloud' ? 'FunAudioLLM/SenseVoiceSmall' : 'iic/SenseVoiceSmall',
+    })
+    setPreferenceSaved(false)
+    setMessage(null)
+  }, [])
+
+  const selectModel = useCallback((model: string) => {
+    setPreference(current => ({ ...current, model: model as VoicePreference['model'] }))
+    setPreferenceSaved(false)
+    setMessage(null)
+  }, [])
+
+  const saveRouting = useCallback(() => {
+    try {
+      saveVoicePreference(preference)
+      setPreferenceSaved(true)
+      setMessage(lang ? '语音配置已保存' : 'Voice configuration saved')
+    } catch {
+      setMessage(lang ? '语音配置保存失败' : 'Voice configuration save failed')
+    }
+  }, [lang, preference])
+
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 20px', maxWidth: 520 }}>
       <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
@@ -73,11 +108,55 @@ export function VoiceSettingsSection({ api }: VoiceSettingsProps) {
       </h2>
       <p style={{ margin: 0, fontSize: 13, opacity: 0.8, lineHeight: 1.6 }}>
         {lang
-          ? '填入云端语音识别服务的 API Key（如 SiliconFlow），保存后麦克风按钮即可实时转写。'
-          : 'Enter the API key for your cloud speech-to-text provider (e.g. SiliconFlow); the mic button transcribes live once saved.'}
+          ? '首次使用请选择云端 API 或本地离线模型；麦克风会按此选择逐次转写。'
+          : 'For first use, choose the cloud API or a local offline model; the mic uses this choice for every transcription.'}
       </p>
 
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+      <fieldset style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: 0, padding: 12, border: '1px solid rgba(128,128,128,0.35)', borderRadius: 8 }}>
+        <legend style={{ padding: '0 4px', fontSize: 13 }}>{lang ? '处理方式' : 'Processing'}</legend>
+        <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
+          {(['local', 'cloud'] as const).map(backend => (
+            <label key={backend} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="radio"
+                name="voice-backend"
+                value={backend}
+                checked={preference.backend === backend}
+                onChange={() => { selectBackend(backend) }}
+              />
+              {backend === 'local'
+                ? (lang ? '本地离线' : 'Local offline')
+                : (lang ? '云端 API' : 'Cloud API')}
+            </label>
+          ))}
+        </div>
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+          <span>{lang ? '转写模型' : 'Transcription model'}</span>
+          <select
+            value={preference.model}
+            onChange={(event) => { selectModel(event.target.value) }}
+            style={{ padding: '8px 10px', fontSize: 13, borderRadius: 6, border: '1px solid rgba(128,128,128,0.4)', background: 'transparent', color: 'inherit' }}
+          >
+            {preference.backend === 'cloud'
+              ? <option value="FunAudioLLM/SenseVoiceSmall">SenseVoiceSmall (SiliconFlow)</option>
+              : LOCAL_MODELS.map((model: LocalTranscriptionModel) => (
+                <option key={model} value={model}>{model === 'iic/SenseVoiceSmall' ? 'SenseVoiceSmall（中文优先）' : `faster-whisper ${model}`}</option>
+              ))}
+          </select>
+        </label>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button type="button" onClick={saveRouting} style={{ padding: '7px 14px', fontSize: 13, borderRadius: 6, border: '1px solid rgba(128,128,128,0.4)', background: 'transparent', color: 'inherit', cursor: 'pointer' }}>
+            {lang ? '保存语音配置' : 'Save voice configuration'}
+          </button>
+          <span style={{ fontSize: 12, opacity: 0.75 }}>
+            {preferenceSaved ? (lang ? '已配置' : 'Configured') : (lang ? '尚未保存' : 'Not saved')}
+          </span>
+        </div>
+      </fieldset>
+
+      {preference.backend === 'cloud' && <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
         <span>{lang ? 'API Key' : 'API key'}</span>
         <input
           type="password"
@@ -94,9 +173,9 @@ export function VoiceSettingsSection({ api }: VoiceSettingsProps) {
             color: 'inherit',
           }}
         />
-      </label>
+      </label>}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {preference.backend === 'cloud' && <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button
           type="button"
           onClick={() => { void save() }}
@@ -120,12 +199,12 @@ export function VoiceSettingsSection({ api }: VoiceSettingsProps) {
             : (lang ? '未配置' : 'Not configured')}
         </span>
         {message !== null && <span style={{ fontSize: 12, opacity: 0.85 }} role="status">{message}</span>}
-      </div>
+      </div>}
 
       <p style={{ margin: 0, fontSize: 12, opacity: 0.65, lineHeight: 1.6 }}>
         {lang
-          ? '本地离线部署：在对话输入框运行 /voice-local status|install|start|stop。'
-          : 'Offline local backend: run /voice-local status|install|start|stop in the composer.'}
+          ? '本地模型按需切换；首次加载大模型会较慢。服务管理：/voice-local status|install|start|stop。'
+          : 'Local models switch on demand; the first large-model load is slower. Manage the service with /voice-local status|install|start|stop.'}
       </p>
     </section>
   )

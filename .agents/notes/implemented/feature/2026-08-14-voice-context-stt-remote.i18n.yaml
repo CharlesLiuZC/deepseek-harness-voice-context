@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-voice-context-stt-remote.md
-2026-08-14-voice-context-stt-remote.md: bc58226604f54f8db741b674f362ebd67d047979
-2026-08-14-voice-context-stt-remote.zh.md: cde58b6717459c59456af7f6d8278e32dcffe31a
+2026-08-14-voice-context-stt-remote.md: 6af7da274b5bc7dc52006c0e120e5dd276f5bcee
+2026-08-14-voice-context-stt-remote.zh.md: d13ecd8e927810e2b5b5d494fee46be5d1635ef6

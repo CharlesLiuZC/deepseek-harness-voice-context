@@ -11,7 +11,7 @@ describe('resolveConfig', () => {
       language: 'zh',
       maxBytes: 25 * 1024 * 1024,
       timeoutMs: 60000,
-      localPort: 8080,
+      localPort: 8000,
       pythonBin: 'python',
     })
   })

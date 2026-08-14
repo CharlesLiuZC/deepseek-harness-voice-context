@@ -1,8 +1,8 @@
 /**
  * Local backend manager: detect whether the host can run a local STT model,
- * install the FunASR requirements, launch the local SenseVoiceSmall server as
- * a tracked child process, and report status. The `/voice-local` command (see
- * index.ts) is the human-facing surface.
+ * install the FunASR and faster-whisper runtimes, launch the companion server
+ * as a tracked child process, and report status. The `/voice-local` command
+ * (see index.ts) is the human-facing surface.
  * @module @deepseek-ai/dsh-voice-context/local
  */
 
@@ -58,7 +58,10 @@ export class LocalSttManager {
 
   constructor(private readonly config: ResolvedConfig) {}
 
-  /** Report hardware capability and local-backend readiness as UI text. */
+  /**
+   * Report hardware capability and local-backend readiness as UI text.
+   * @returns a command result containing the readiness report.
+   */
   async status(): Promise<CommandResult> {
     const lines: string[] = []
 
@@ -74,33 +77,54 @@ export class LocalSttManager {
     lines.push(`RAM: ${(totalmem() / 2 ** 30).toFixed(1)} GiB`)
 
     if (python.ok) {
-      const funasr = await check(this.config.pythonBin, ['-c', 'import funasr'])
-      lines.push(funasr.ok
-        ? 'FunASR: installed'
-        : 'FunASR: not installed — run /voice-local install')
+      const dependencies = await check(this.config.pythonBin, ['-c', 'import funasr, faster_whisper, torch'])
+      lines.push(dependencies.ok
+        ? 'Local STT dependencies: installed'
+        : 'Local STT dependencies: incomplete — run /voice-local install')
     }
 
     lines.push(await serverHealthy(this.config.localPort)
       ? `Local server: running on 127.0.0.1:${this.config.localPort}`
-      : `Local server: not running — run /voice-local start`)
+      : 'Local server: not running — run /voice-local start')
 
     return { kind: 'success', text: lines.join('\n') }
   }
 
-  /** Install the FunASR requirements into the active Python environment. */
+  /**
+   * Install both local engines and CPU torch into the active Python environment.
+   * @param signal - cancellation signal forwarded to pip.
+   * @returns the install outcome as a command result.
+   */
   async install(signal: AbortSignal): Promise<CommandResult> {
     const python = await check(this.config.pythonBin, ['--version'])
     if (!python.ok) {
       return { kind: 'error', text: `Python not found (tried "${this.config.pythonBin}"); install Python 3.9+ or set pythonBin in config.` }
     }
-    const output = await runInstall(this.config.pythonBin, `${LOCAL_DIR}requirements.txt`, signal)
-    if (!output.ok) {
-      return { kind: 'error', text: `pip install failed:\n${output.output}` }
+    const torch = await check(this.config.pythonBin, ['-c', 'import torch, torchaudio'])
+    const installs: string[][] = [
+      ['-m', 'pip', 'install', '-r', `${LOCAL_DIR}requirements.txt`],
+      ['-m', 'pip', 'install', '-r', `${LOCAL_DIR}requirements-faster-whisper.txt`],
+    ]
+    if (!torch.ok) {
+      installs.push([
+        '-m', 'pip', 'install', 'torch', 'torchaudio',
+        '--index-url', 'https://download.pytorch.org/whl/cpu',
+        '--extra-index-url', 'https://pypi.org/simple',
+      ])
     }
-    return { kind: 'success', text: `Installed FunASR requirements. Run /voice-local start, then point baseUrl at http://127.0.0.1:${this.config.localPort}.` }
+    for (const args of installs) {
+      const output = await runInstall(this.config.pythonBin, args, signal)
+      if (!output.ok) {
+        return { kind: 'error', text: `pip install failed:\n${output.output}` }
+      }
+    }
+    return { kind: 'success', text: `Installed local STT dependencies. Download any faster-whisper weights you want, then run /voice-local start; the server listens at http://127.0.0.1:${this.config.localPort}.` }
   }
 
-  /** Launch the local server as a tracked child process. */
+  /**
+   * Launch the local server as a tracked child process.
+   * @returns the launch outcome as a command result.
+   */
   async start(): Promise<CommandResult> {
     if (await serverHealthy(this.config.localPort)) {
       return { kind: 'success', text: `Local server already running on 127.0.0.1:${this.config.localPort}.` }
@@ -119,21 +143,29 @@ export class LocalSttManager {
 
     const running = await waitHealthy(this.config.localPort)
     return running
-      ? { kind: 'success', text: `Local SenseVoiceSmall server started on 127.0.0.1:${this.config.localPort}. Point baseUrl at it.` }
+      ? { kind: 'success', text: `Local STT server started on 127.0.0.1:${this.config.localPort}. Point baseUrl at it.` }
       : { kind: 'error', text: `Server launched but /health is not answering on 127.0.0.1:${this.config.localPort}; check the uvicorn output.` }
   }
 
-  /** Stop the tracked local server. */
-  async stop(): Promise<CommandResult> {
+  /**
+   * Stop the tracked local server.
+   * @returns the stop outcome as a command result.
+   */
+  stop(): Promise<CommandResult> {
     if (this.child === undefined) {
-      return { kind: 'success', text: 'No local server is tracked by this process.' }
+      return Promise.resolve({ kind: 'success', text: 'No local server is tracked by this process.' })
     }
     this.child.kill()
     this.child = undefined
-    return { kind: 'success', text: 'Stopped the local server.' }
+    return Promise.resolve({ kind: 'success', text: 'Stopped the local server.' })
   }
 
-  /** Dispatch one parsed `/voice-local` invocation to its subcommand. */
+  /**
+   * Dispatch one parsed `/voice-local` invocation to its subcommand.
+   * @param rawInput - unparsed text after the command name.
+   * @param signal - cancellation signal for long-running installation.
+   * @returns the selected subcommand outcome.
+   */
   async run(rawInput: string, signal: AbortSignal): Promise<CommandResult> {
     switch (rawInput.trim().toLowerCase()) {
       case '':
@@ -151,12 +183,12 @@ export class LocalSttManager {
   }
 }
 
-/** Run `python -m pip install -r <requirement>` and capture its output. */
-function runInstall(python: string, requirement: string, signal: AbortSignal): Promise<CheckResult> {
+/** Run one pip installation command and capture its output. */
+function runInstall(python: string, args: string[], signal: AbortSignal): Promise<CheckResult> {
   return new Promise((resolve) => {
     execFile(
       python,
-      ['-m', 'pip', 'install', '-r', requirement],
+      args,
       { encoding: 'utf8', timeout: 30 * 60 * 1000, signal, maxBuffer: 16 * 1024 * 1024 },
       (error, stdout, stderr) => {
         resolve({ ok: error === null, output: `${stdout}\n${stderr}`.trim() })

@@ -1,6 +1,6 @@
 # Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write packages/client/ui-voice-context/README.md
-README.md: 10d35e4bfed1432b994aa195735907317ca94187
-README.zh.md: dfcf64c42e17e87ff790df421d06d4070703a3a1
+#   pnpm run verify-translation-pairing --write packages/voice/voice-context/local/funasr/README.md
+README.md: 5b805e3d01cce3795d955ef58e58dd920a2b318b
+README.zh.md: 69b8621ab4afd53598ada8ee920bb0ba3cd611c7

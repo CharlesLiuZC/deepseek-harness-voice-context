@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-14-selectable-voice-transcription-backends.md
+2026-08-14-selectable-voice-transcription-backends.md: d928f189c4c1c6252924d70cbe6d012f65b1a502
+2026-08-14-selectable-voice-transcription-backends.zh.md: 273b146d2c7cc1379619b14d06ad3b8cc5133268

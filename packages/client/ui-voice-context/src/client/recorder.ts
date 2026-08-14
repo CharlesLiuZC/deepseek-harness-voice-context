@@ -70,7 +70,7 @@ function encodeWav(samples: Float32Array): ArrayBuffer {
   view.setUint32(40, dataBytes, true)
   let offset = 44
   for (let i = 0; i < samples.length; i++) {
-    const clamped = Math.max(-1, Math.min(1, samples[i]!))
+    const clamped = Math.max(-1, Math.min(1, samples[i] ?? 0))
     view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true)
     offset += 2
   }
@@ -105,7 +105,10 @@ export class VoiceRecorder {
     this.mediaRecorder.start()
   }
 
-  /** Stop recording and resolve to a 16 kHz mono WAV Blob. */
+  /**
+   * Stop recording and encode the captured audio.
+   * @returns a 16 kHz mono WAV blob.
+   */
   stop(): Promise<Blob> {
     return new Promise<Blob>((resolve, reject) => {
       const recorder = this.mediaRecorder
@@ -119,8 +122,8 @@ export class VoiceRecorder {
         const container = new Blob(this.chunks, { type: mimeType })
         this.chunks = []
         container.arrayBuffer()
-          .then((buffer) => decodeToMono16k(buffer))
-          .then((samples) => new Blob([encodeWav(samples)], { type: 'audio/wav' }))
+          .then(buffer => decodeToMono16k(buffer))
+          .then(samples => new Blob([encodeWav(samples)], { type: 'audio/wav' }))
           .then(resolve, reject)
       }
       recorder.onerror = () => {

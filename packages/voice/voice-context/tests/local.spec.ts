@@ -68,7 +68,7 @@ describe('LocalSttManager.run', () => {
     expect(result.text).toContain('GPU: none detected')
     expect(result.text).toContain('CPU cores: 2')
     expect(result.text).toContain('RAM: 16.0 GiB')
-    expect(result.text).toContain('FunASR: installed')
+    expect(result.text).toContain('Local STT dependencies: installed')
     expect(result.text).toContain('Local server: running on 127.0.0.1:8080')
   })
 
@@ -77,6 +77,47 @@ describe('LocalSttManager.run', () => {
     const result = await new LocalSttManager(config()).run('install', new AbortController().signal)
     expect(result.kind).toBe('error')
     expect(result.text).toContain('Python not found')
+  })
+
+  it('installs both engines and CPU torch', async () => {
+    mockChecks({
+      '--version': { ok: true, output: 'Python 3.12.8' },
+      '-c': { ok: false, output: 'torch is missing' },
+    })
+
+    const result = await new LocalSttManager(config()).run('install', new AbortController().signal)
+
+    expect(result.kind).toBe('success')
+    expect(result.text).toContain('Installed local STT dependencies')
+    expect(execFileMock).toHaveBeenCalledTimes(5)
+    expect(execFileMock.mock.calls[2]?.[1]).toEqual(expect.arrayContaining([expect.stringContaining('requirements.txt')]))
+    expect(execFileMock.mock.calls[3]?.[1]).toEqual(expect.arrayContaining([expect.stringContaining('requirements-faster-whisper.txt')]))
+    expect(execFileMock.mock.calls[4]?.[1]).toEqual(expect.arrayContaining(['torch', 'torchaudio']))
+  })
+
+  it('preserves an existing torch installation', async () => {
+    mockChecks({
+      '--version': { ok: true, output: 'Python 3.12.8' },
+      '-c': { ok: true, output: '' },
+    })
+
+    const result = await new LocalSttManager(config()).run('install', new AbortController().signal)
+
+    expect(result.kind).toBe('success')
+    expect(execFileMock).toHaveBeenCalledTimes(4)
+    expect(execFileMock.mock.calls.flatMap(call => call[1])).not.toContain('https://download.pytorch.org/whl/cpu')
+  })
+
+  it('stops installation at the first failed pip command', async () => {
+    execFileMock
+      .mockImplementationOnce((_command, _args, _opts, callback) => { callback(null, 'Python 3.12.8', '') })
+      .mockImplementationOnce((_command, _args, _opts, callback) => { callback(null, '', '') })
+      .mockImplementationOnce((_command, _args, _opts, callback) => { callback(new Error('pip failed'), '', 'network unavailable') })
+
+    const result = await new LocalSttManager(config()).run('install', new AbortController().signal)
+
+    expect(result).toEqual({ kind: 'error', text: 'pip install failed:\nnetwork unavailable' })
+    expect(execFileMock).toHaveBeenCalledTimes(3)
   })
 
   it('reports a healthy server as already running on start', async () => {

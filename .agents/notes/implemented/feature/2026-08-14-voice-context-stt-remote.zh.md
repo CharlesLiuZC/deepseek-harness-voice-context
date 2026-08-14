@@ -2,6 +2,8 @@
 
 Status: implemented
 
+[English](2026-08-14-voice-context-stt-remote.md) | 中文
+
 ## Problem
 
 用户在 Web 界面对话时，需要一条从浏览器音频到转写文本的路径，且要满足：(1) 与所有一等公民宿主能力一样经过 `/api` 浏览器信任闸门；(2) 接受用户填写的 API Key 而无需重启；(3) 当宿主硬件能跑本地模型时，可退化为可选的本地离线后端。集成前的独立插件通过 `/api` 之外的裸 `webServer` 路由触达宿主，绕过了信任闸门，且密钥只从 `cordis.yml`/环境变量读取。

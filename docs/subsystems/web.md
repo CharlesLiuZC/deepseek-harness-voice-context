@@ -139,6 +139,23 @@ Selection never depends on registration, config, or HMR order: a capability has 
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxvoicecontext--voicecontextservice"></a>
+
+### `ctx.voiceContext` — `VoiceContextService`
+
+Speech-to-text service (`ctx.voiceContext`) exposed through Typert Gateway.
+
+```ts cordis-catalog
+/**
+ * Transcribe one audio payload through the configured STT provider.
+ * @param request - audio container plus optional language, backend, and model choices.
+ * @returns the transcribed text.
+ */
+@Remote('transcribe') async transcribe(request: TranscribeRequest): Promise<TranscribeResult>
+```
+
+Source: [`packages/voice/voice-context/src/index.ts:43`](../../packages/voice/voice-context/src/index.ts)
+
 <a id="ctxweb--webruntime"></a>
 
 ### `ctx.web` — `WebRuntime`

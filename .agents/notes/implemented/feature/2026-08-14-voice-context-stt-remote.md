@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-08-14-voice-context-stt-remote.zh.md)
+
 ## Problem
 
 A user speaking to the Web UI needed a path from browser audio to transcribed text that (1) crossed the same `/api` browser-trust fence as every first-party Host capability, (2) accepted a user-typed API key without a restart, and (3) degraded to an optional local offline backend when the host can run one. The pre-integration standalone plugin reached the Host through a raw `webServer` route outside `/api`, bypassing the trust fence, and read the credential from `cordis.yml`/environment only.

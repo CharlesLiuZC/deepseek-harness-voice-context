@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { TranscribeRequest } from '@deepseek-ai/dsh-voice-context/client'
 import { VoiceRecorder } from './recorder.ts'
+import { loadVoicePreference } from './preferences.ts'
 
 /** Outcome of one transcription, mapped from the Remote result. */
 export type TranscribeOutcome =
@@ -35,7 +36,7 @@ function appendTranscript(draft: string, text: string): string {
 async function blobToBase64(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer())
   let binary = ''
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!)
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i] ?? 0)
   return btoa(binary)
 }
 
@@ -68,9 +69,12 @@ export function VoiceInput({ input, inputActions, transcribe }: VoiceInputProps)
       try {
         if (recorder === null) throw new Error('recorder not started')
         const wav = await recorder.stop()
+        const preference = loadVoicePreference()
         const outcome = await transcribe({
           audio: await blobToBase64(wav),
           mimeType: 'audio/wav',
+          backend: preference.backend,
+          model: preference.model,
           ...(zh ? { language: 'zh' } : {}),
         })
         if (!outcome.ok) throw new Error(outcome.error)

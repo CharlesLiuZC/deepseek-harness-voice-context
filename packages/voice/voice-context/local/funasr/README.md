@@ -1,55 +1,106 @@
-# 本地 STT：FunASR + SenseVoiceSmall
+# Local speech-to-text server
 
-中文准确率最高的离线方案：阿里 FunASR 的 **SenseVoiceSmall**（`iic/SenseVoiceSmall`，~234M 参数），
-用 40 行 FastAPI 包装成插件宿主面已经在调的 OpenAI 兼容 `/v1/audio/transcriptions`。
+English | [中文](README.zh.md)
 
-## 1. 安装
+This directory contains the companion OpenAI-compatible speech-to-text server for Voice Context. It supports FunASR SenseVoiceSmall and local faster-whisper CTranslate2 models behind one `POST /v1/audio/transcriptions` endpoint.
 
-```sh
-cd local/funasr
-python -m venv .venv
-. .venv/Scripts/activate          # Windows（Linux/macOS 用 source .venv/bin/activate）
-pip install -r requirements.txt
+## Supported models
+
+| Public model id | Engine | Intended use | Download behavior |
+|---|---|---|---|
+| `iic/SenseVoiceSmall` | FunASR | Fast Chinese-first transcription | FunASR downloads it on first use |
+| `small` | faster-whisper | Fast multilingual transcription | Run `download_models.py small` |
+| `medium` | faster-whisper | Higher multilingual accuracy | Run `download_models.py medium` |
+| `large-v3` | faster-whisper | Highest-quality local Whisper option | Run `download_models.py large-v3` |
+
+The server accepts only these ids. It does not treat caller-provided paths or repository names as models.
+
+## Quick start
+
+Windows:
+
+```bat
+start.bat
 ```
 
-> 依赖里 `funasr` 会带出 `torch`。默认是 CPU 版即可跑 SenseVoiceSmall；有 NVIDIA 显卡想提速，
-> 按 PyTorch 官网换成 CUDA 版 torch。首次启动会从 ModelScope 下载 ~1GB 权重。
-
-## 2. 启动
+Linux or macOS:
 
 ```sh
-uvicorn server:app --host 127.0.0.1 --port 8080
+bash start.sh
 ```
 
-自检：
+The script creates `.venv`, installs the server, both inference engines, and CPU torch, then listens on `http://127.0.0.1:8000`. Replace the torch installation in the script with a compatible CUDA build when GPU inference is required.
+
+SenseVoiceSmall downloads automatically on first use. Download faster-whisper weights explicitly after the virtual environment exists:
+
+```powershell
+.venv\Scripts\python download_models.py small
+.venv\Scripts\python download_models.py medium large-v3
+.venv\Scripts\python download_models.py all
+```
 
 ```sh
-curl http://127.0.0.1:8080/health
-# {"ok":true,"model":"iic/SenseVoiceSmall"}
+.venv/bin/python download_models.py small
+.venv/bin/python download_models.py medium large-v3
+.venv/bin/python download_models.py all
 ```
 
-## 3. 接到 dsh
+The helper downloads from the allowlisted `Systran/faster-whisper-*` Hugging Face repositories with one worker. Model files remain under `models/faster-whisper/` and are ignored by Git.
 
-用仓库里现成的 overlay 把 `baseUrl` 指向本地：
+## Health and model discovery
 
 ```sh
-cd dsh-voice-context
-pnpm dsh web --patch ./local/cordis.patch.local.yml
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/v1/models
 ```
 
-或手动在 `cordis.patch.yml` 里覆盖：
+`/health` reports the default model, currently loaded model, installed model ids, and inference device. `/v1/models` returns an OpenAI-style model list containing only models available to this server.
+
+## Transcribe audio
+
+```sh
+curl http://127.0.0.1:8000/v1/audio/transcriptions \
+  -F "file=@audio.wav" \
+  -F "model=small" \
+  -F "language=zh"
+```
+
+Supported audio suffixes are WAV, MP3, FLAC, OGG, M4A, OPUS, and AAC. The server preserves the uploaded suffix for decoder selection, removes SenseVoice tag prefixes, and returns clean transcript text. See [`client_example.py`](client_example.py) for a Python client.
+
+## Connect to DeepSeek Harness
+
+Point the Voice Context entry at the same loopback port:
 
 ```yaml
 - id: voice-context
+  name: '@deepseek-ai/dsh-voice-context'
   config:
-    baseUrl: http://127.0.0.1:8080
-    model: sensevoice-small
-    apiKey: local          # 本地后端忽略鉴权，填非空即可
+    baseUrl: http://127.0.0.1:8000
+    model: iic/SenseVoiceSmall
+    language: zh
+    localPort: 8000
 ```
 
-## 4. 可选
+The browser's explicit local selection uses `localPort`; `baseUrl` remains the deployment's configured cloud origin when cloud mode is enabled. Loopback requests never receive the cloud bearer credential.
 
-- 换模型：`FUNASR_MODEL=iic/SenseVoiceSmall`（默认）已是最优中文小模型；也可用
-  `iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch`（Paraformer 中文大模型）。
-- 换 HF 源：把 `AutoModel(model=..., hub="hf")` 改成 `"FunAudioLLM/SenseVoiceSmall"` 可从 HuggingFace 拉取。
-- 中文标点/数字归一：`use_itn=True` 已开启（口语数字→阿拉伯数字）。
+The `/voice-local status|install|start|stop` command can install and manage this server as a child of the DeepSeek Harness process. A server started by the command stops with its owning Harness process.
+
+## Environment variables
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `STT_MODEL` | `iic/SenseVoiceSmall` | Fallback used when the request sends `model=local` |
+| `STT_MODEL_ROOT` | `./models/faster-whisper` | CTranslate2 model directory |
+| `STT_DEVICE` | `cpu` | faster-whisper device: `cpu` or `cuda` |
+| `STT_HOST` | `127.0.0.1` | Listening interface when running `server.py` |
+| `STT_PORT` | `8000` | Listening port when running `server.py` |
+
+Copy `.env.example` to `.env` to persist local overrides. The `.env` file is ignored by Git.
+
+## Runtime behavior and security
+
+- Model loading and inference are serialized. One model remains resident; selecting another evicts it after the replacement loads.
+- CPU faster-whisper uses `int8`; non-CPU devices use `float16`.
+- An unavailable but allowlisted faster-whisper model returns HTTP 400. A model load or inference failure returns HTTP 503.
+- The service has no authentication and binds to loopback by default. Exposing it with `STT_HOST=0.0.0.0` requires a trusted reverse proxy, authentication, and transport security.
+- FunASR does not install torch because torch builds are hardware-specific. The start scripts install the CPU wheels explicitly; custom GPU deployments must choose their own compatible torch build.

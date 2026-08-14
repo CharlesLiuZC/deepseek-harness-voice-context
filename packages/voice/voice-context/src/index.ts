@@ -11,11 +11,11 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import type { CommandInvocation } from '@deepseek-ai/dsh-commands'
+import z from '@deepseek-ai/schemastery'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 // Typert-generated ./typert and ./remote artifacts import Zod at runtime.
 import type {} from 'zod'
-import { Config, resolveConfig, type ResolvedConfig } from './config.ts'
-import type { Config as ConfigType } from './config.ts'
+import { resolveConfig, type ResolvedConfig, type VoiceContextConfig } from './config.ts'
 import { transcribeAudio } from './transcribe.ts'
 import { LocalSttManager } from './local.ts'
 import type { TranscribeRequest, TranscribeResult } from './types.ts'
@@ -26,6 +26,19 @@ export type * from './types.ts'
 
 export const name = 'voice-context'
 
+/** Loader schema for the Voice-Context service. */
+export const Config: z<VoiceContextConfig> = z.object({
+  apiKey: z.string().role('secret'),
+  apiKeyEnv: z.string().role('credential-ref').default('SILICONFLOW_API_KEY'),
+  baseUrl: z.string().default('https://api.siliconflow.cn'),
+  model: z.string().default('FunAudioLLM/SenseVoiceSmall'),
+  language: z.string().default('zh'),
+  maxBytes: z.natural().default(25 * 1024 * 1024),
+  timeoutMs: z.natural().default(60000),
+  localPort: z.natural().max(65535).default(8000),
+  pythonBin: z.string().default('python'),
+})
+
 /** Speech-to-text service (`ctx.voiceContext`) exposed through Typert Gateway. */
 export class VoiceContextService extends TypertRemoteService {
   static inject: string[] = []
@@ -35,7 +48,7 @@ export class VoiceContextService extends TypertRemoteService {
   private readonly resolved: ResolvedConfig
   private readonly local: LocalSttManager
 
-  constructor(ctx: Context, config: ConfigType = {}) {
+  constructor(ctx: Context, config: VoiceContextConfig = {}) {
     super(ctx, 'voiceContext')
     this.resolved = resolveConfig(config)
     this.local = new LocalSttManager(this.resolved)
@@ -54,7 +67,7 @@ export class VoiceContextService extends TypertRemoteService {
 
   /**
    * Transcribe one audio payload through the configured STT provider.
-   * @param request - base64 audio, its container, and optional language hint.
+   * @param request - audio container plus optional language, backend, and model choices.
    * @returns the transcribed text.
    */
   @Remote('transcribe')

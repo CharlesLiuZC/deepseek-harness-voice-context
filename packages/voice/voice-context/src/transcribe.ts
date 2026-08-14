@@ -11,6 +11,10 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { ResolvedConfig } from './config.ts'
 import type { TranscribeRequest, TranscribeResult } from './types.ts'
 
+const CLOUD_BASE_URL = 'https://api.siliconflow.cn'
+const CLOUD_MODEL = 'FunAudioLLM/SenseVoiceSmall'
+const LOCAL_MODEL_IDS = new Set(['iic/SenseVoiceSmall', 'small', 'medium', 'large-v3'])
+
 /** Resolve the API key for one request: credentials seam → literal → environment. */
 async function resolveApiKey(ctx: Context, config: ResolvedConfig): Promise<string | undefined> {
   const credentials = ctx.get('credentials')
@@ -33,6 +37,24 @@ function isLoopback(baseUrl: string): boolean {
   }
 }
 
+/** Resolve the trusted upstream route for one browser-selected backend. */
+function resolveTarget(config: ResolvedConfig, request: TranscribeRequest): { baseUrl: string; model: string } {
+  if (request.backend === 'local') {
+    const model = request.model ?? 'iic/SenseVoiceSmall'
+    if (!LOCAL_MODEL_IDS.has(model)) throw new Error(`voice-context: invalid local STT model ${model}`)
+    return { baseUrl: `http://127.0.0.1:${config.localPort}`, model }
+  }
+  if (request.backend === 'cloud') {
+    const model = request.model ?? CLOUD_MODEL
+    if (model !== CLOUD_MODEL) throw new Error(`voice-context: invalid cloud STT model ${model}`)
+    return {
+      baseUrl: isLoopback(config.baseUrl) ? CLOUD_BASE_URL : config.baseUrl,
+      model,
+    }
+  }
+  return { baseUrl: config.baseUrl, model: config.model }
+}
+
 /** Upstream filename extension from a container MIME type. */
 function filenameFor(mimeType: string): string {
   if (mimeType.includes('webm')) return 'audio.webm'
@@ -50,7 +72,7 @@ function extractText(parsed: unknown): string {
     if (typeof record.result === 'string') return record.result
     if (Array.isArray(record.segments)) {
       const joined = record.segments
-        .map((segment) => (segment !== null && typeof segment === 'object'
+        .map(segment => (segment !== null && typeof segment === 'object'
           ? (segment as Record<string, unknown>).text
           : undefined))
         .filter((text): text is string => typeof text === 'string')
@@ -74,8 +96,9 @@ export async function transcribeAudio(
   config: ResolvedConfig,
   request: TranscribeRequest,
 ): Promise<TranscribeResult> {
-  const apiKey = await resolveApiKey(ctx, config)
-  if (apiKey === undefined && !isLoopback(config.baseUrl)) {
+  const target = resolveTarget(config, request)
+  const apiKey = isLoopback(target.baseUrl) ? undefined : await resolveApiKey(ctx, config)
+  if (apiKey === undefined && !isLoopback(target.baseUrl)) {
     throw new Error(`voice-context: no STT credential configured (set ${config.apiKeyEnv} in settings)`)
   }
 
@@ -84,14 +107,14 @@ export async function transcribeAudio(
   if (audio.length > config.maxBytes) throw new Error('voice-context: audio payload exceeds maxBytes')
 
   const form = new FormData()
-  form.append('model', config.model)
+  form.append('model', target.model)
   form.append('language', request.language ?? config.language)
   form.append('file', new Blob([audio], { type: request.mimeType }), filenameFor(request.mimeType))
 
   const headers: Record<string, string> = {}
   if (apiKey !== undefined) headers.authorization = `Bearer ${apiKey}`
 
-  const upstream = await fetch(`${config.baseUrl.replace(/\/+$/, '')}/v1/audio/transcriptions`, {
+  const upstream = await fetch(`${target.baseUrl.replace(/\/+$/, '')}/v1/audio/transcriptions`, {
     method: 'POST',
     headers,
     body: form,

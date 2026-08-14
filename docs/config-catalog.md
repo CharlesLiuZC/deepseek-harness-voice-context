@@ -2843,6 +2843,36 @@ export type ApprovalPolicy = 'ask' | 'never'
 
 Source: [`packages/interaction/user-approval/src/index.ts:177`](../packages/interaction/user-approval/src/index.ts)
 
+<a id="deepseek-aidsh-voice-context"></a>
+
+## `@deepseek-ai/dsh-voice-context`
+
+```ts config-catalog
+/** User-owned Voice-Context service configuration. */
+export interface VoiceContextConfig {
+  /** Literal STT bearer token; prefer {@link apiKeyEnv}. */
+  apiKey?: string
+  /** Credential reference name resolved through the credentials seam each call. */
+  apiKeyEnv?: string
+  /** OpenAI-compatible provider origin, e.g. `https://api.siliconflow.cn`. */
+  baseUrl?: string
+  /** Provider model id, e.g. `FunAudioLLM/SenseVoiceSmall`. */
+  model?: string
+  /** BCP-47 language hint sent upstream. */
+  language?: string
+  /** Hard cap on the accepted audio payload in bytes. */
+  maxBytes?: number
+  /** Upstream request timeout in milliseconds. */
+  timeoutMs?: number
+  /** Port the local STT server (see `/voice-local`) listens on. */
+  localPort?: number
+  /** Python interpreter used to install and launch the local backend. */
+  pythonBin?: string
+}
+```
+
+Source: [`packages/voice/voice-context/src/config.ts:10`](../packages/voice/voice-context/src/config.ts)
+
 <a id="deepseek-aidsh-web"></a>
 
 ## `@deepseek-ai/dsh-web`
@@ -3058,6 +3088,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-tool` ([`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-trajectory` ([`packages/client/ui-trajectory/src/index.ts`](../packages/client/ui-trajectory/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-user-questions` ([`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-voice-context` ([`packages/client/ui-voice-context/src/index.ts`](../packages/client/ui-voice-context/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-workflow-run` ([`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-workspace` ([`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts))
 - `@deepseek-ai/dsh-command-compact` — requires `commands` · `compaction` ([`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts))
