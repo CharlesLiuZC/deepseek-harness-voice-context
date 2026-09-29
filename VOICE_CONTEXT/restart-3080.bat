@@ -15,8 +15,9 @@ echo.
 echo   Waiting for the port to release ...
 timeout /t 2 /nobreak >nul
 
-REM 2) 在新窗口启动服务（关闭该窗口即停止服务）
-start "DeepSeek Harness Web (3080)" cmd /k "cd /d D:\deepseek-harness && pnpm dsh web"
+REM 2) 切到仓库根目录（本脚本上一级），再在新窗口启动服务
+cd /d "%~dp0.."
+start "DeepSeek Harness Web (3080)" cmd /k "pnpm dsh web"
 
 REM 3) 等启动后自动打开浏览器
 echo.

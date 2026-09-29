@@ -48,7 +48,7 @@
 ## 四、如何运行（真实语音转文字）
 
 ```sh
-cd D:\deepseek-harness
+cd <仓库根目录>          # clone 下来的 deepseek-harness-voice-context 目录
 pnpm install
 pnpm run build          # build:lib:host + build:lib:client + build:web
 # 云端：

@@ -50,7 +50,7 @@
 ## 运行验证（真实语音转文字）
 
 ```sh
-cd D:\deepseek-harness
+cd <仓库根目录>          # clone 下来的 deepseek-harness-voice-context 目录
 pnpm install && pnpm run build
 $env:SILICONFLOW_API_KEY = "sk-xxxx"   # 或启动后在 设置 → 语音输入 页填写
 pnpm dsh web    # http://127.0.0.1:3080，输入框左侧点麦克风 → 说话 → 自动转写进草稿
